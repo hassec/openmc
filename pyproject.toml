@@ -1,2 +1,19 @@
 [build-system]
 requires = ["setuptools", "wheel", "numpy", "cython"]
+
+[tool.cibuildwheel]
+# Disable building PyPy wheels on all platforms, and CPython3.6
+skip = ["cp36-*", "pp*", "*musllinux*"]
+
+# we should probably build arm here too, but that's hard to debug
+# without having a mac to try this locally first.
+[tool.cibuildwheel.macos]
+archs = ["x86_64"]
+before-all = "brew install homebrew/core/hdf5"
+
+# aarch64 might be possible via QMEU in github actions?
+# and then use the corresponding aarch64 image from h5py
+[tool.cibuildwheel.linux]
+archs = ["x86_64"]
+manylinux-x86_64-image = "ghcr.io/h5py/manylinux2014_x86_64-hdf5"
+
