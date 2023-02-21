@@ -4,6 +4,7 @@ import glob
 import os
 import shutil
 import sys
+from pathlib import Path
 
 import numpy as np
 from Cython.Build import cythonize
@@ -40,20 +41,61 @@ class OpenMCBuildExt(build_ext):
 
         self.announce("Configuring cmake project", level=3)
 
-        self.spawn(
-            [
-                "cmake",
-                "-S" + ext.cmake_lists_dir,
-                "-B" + self.build_temp,
-                "-DCMAKE_BUILD_TYPE=Release",
-            ]
-        )
+        build_type = os.getenv("OPENMC_BUILD_TYPE", "Release")
+        cov = "ON" if os.getenv("COVERAGE") == "y" else "OFF"
+        mcpl = "ON" if os.getenv("MCPL") == "y" else "OFF"
+        omp = "ON" if os.getenv("OMP") == "y" else "OFF"
+        mpi = "ON" if os.getenv("MPI") == "y" else "OFF"
+        phdf5 = "ON" if os.getenv("PHDF5") == "y" else "OFF"
+        dagmc = "ON" if os.getenv("DAGMC") == "y" else "OFF"
+        libmesh = "ON" if os.getenv("LIBMESH") == "y" else "OFF"
+        ncrystal = "ON" if os.getenv("NCRYSTAL") == "y" else "OFF"
+        extra_flags = os.getenv("OPENMC_EXTRA_CMAKE_FLAGS")
+
+        run_cpp_tests = os.getenv("OPENMC_RUN_CPP_TESTS") == "y"
+
+        cmake_cmd = [
+            "cmake",
+            "-S" + ext.cmake_lists_dir,
+            "-B" + self.build_temp,
+            f"-DCMAKE_BUILD_TYPE={build_type}",
+            f"-DOPENMC_USE_OPENMP={omp}",
+            f"-DOPENMC_USE_MPI={mpi}",
+            f"-DHDF5_PREFER_PARALLEL={phdf5}",
+            f"-DOPENMC_USE_DAGMC={dagmc}",
+            f"-DOPENMC_USE_LIBMESH={libmesh}",
+            f"-DOPENMC_USE_NCRYSTAL={ncrystal}",
+            f"-DOPENMC_USE_MCPL={mcpl}",
+            f"-DOPENMC_ENABLE_COVERAGE={cov}",
+        ]
+
+        if extra_flags:
+            cmake_cmd.append(extra_flags)
+
+        self.spawn(cmake_cmd)
 
         self.announce("Building binaries", level=3)
 
         self.spawn(
-            ["cmake", "--build", self.build_temp, "--config", "Release", "--parallel", "2" ]
+            [
+                "cmake",
+                "--build",
+                self.build_temp,
+                "--config",
+                build_type,
+                "--parallel",
+                "2",
+            ]
         )
+        if run_cpp_tests:
+            self.spawn(
+                [
+                    "make",
+                    "-C",
+                    self.build_temp,
+                    "test",
+                ]
+            )
 
         # this various depending on the platform so the easiest is to
         # just check what convention was used
